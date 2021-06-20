@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:task="http://www.springframework.org/schema/task"
+	xsi:schemaLocation="http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.3.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd">
+
+	<bean id="placeholderConfigurer"
+		class="org.springframework.context.support.PropertySourcesPlaceholderConfigurer">
+		<property name="locations" value="classpath:db.properties"></property>
+	</bean>
+
+	<!--配置连接池 -->
+	<!--使用druid数据源 -->
+	<bean id="dataSource"
+		class="com.alibaba.druid.pool.DruidDataSource" init-method="init">
+		<!--注入连接属性 -->
+		<property name="driverClassName" value="${jdbc.driverClass}" />
+		<property name="url" value="${jdbc.jdbcUrl}" />
+		<property name="username" value="${jdbc.user}" />
+		<property name="password" value="${jdbc.password}" />
+		<!--初始化连接池大小 -->
+		<property name="initialSize" value="5"></property>
+		<!--设置最大连接数 -->
+		<property name="maxActive" value="10"></property>
+		<!--设置等待时间 -->
+		<property name="maxWait" value="5000"></property>
+		<property name="filters" value="stat"></property>
+	</bean>
+
+	<!--配置SqlSessionFactory工厂 -->
+	<bean id="sqlSessonFactory"
+		class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="dataSource" />
+		<!-- mybatis配置文件 -->
+		<property name="configLocation"
+			value="classpath:mybatis-config.xml"></property>
+		<!-- 自动扫描mappers.xml文件 -->
+		<property name="mapperLocations"
+			value="classpath:/mappers/*/*.xml"></property>
+		<!-- 注入分页插件 -->
+	</bean>
+	<!--配置IAccountdao接口所在包 -->
+	<!-- 扫描mapper接口 -->
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+	<property name="sqlSessionFactoryBeanName" value="sqlSessonFactory"></property>
+		<!-- 注入mapper接口所在的包 注意多个包的情况的配置 -->
+		<!--注入mapper接口所在的包 -->
+		<property name="basePackage"
+			value="edu.jwj439.sys.dao,edu.jwj439.bus.dao,edu.jwj439.stats.dao">
+		</property>
+		<!-- 注入sqlSessionFactory -->
+	</bean>
+
+	<!-- 配置Service层相关 -->
+	<!--告知spring在创建容器时要扫描的包 -->
+	<context:component-scan
+		base-package="edu.jwj439.sys.service"></context:component-scan>
+	<context:component-scan
+		base-package="edu.jwj439.bus.service"></context:component-scan>
+	<context:component-scan
+		base-package="edu.jwj439.stats.service"></context:component-scan>
+
+	<!-- 1,声明事务管理器 -->
+	<bean id="transactionManager"
+		class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource"></property>
+	</bean>
+	<!-- 启动注解事务 -->
+	<!-- <tx:annotation-driven/> -->
+	<!-- 2,声明事务的传播特性 也就是通知 -->
+	<tx:advice id="advise"
+		transaction-manager="transactionManager">
+		<tx:attributes>
+			<!-- 以add开头的方法名需要事务 -->
+			<tx:method name="add*" propagation="REQUIRED" />
+			<tx:method name="save*" propagation="REQUIRED" />
+			<tx:method name="update*" propagation="REQUIRED" />
+			<tx:method name="delete*" propagation="REQUIRED" />
+			<tx:method name="change*" propagation="REQUIRED" />
+			<tx:method name="reset*" propagation="REQUIRED" />
+			<tx:method name="get*" read-only="true" />
+			<tx:method name="load*" read-only="true" />
+			<tx:method name="*" read-only="true" />
+		</tx:attributes>
+	</tx:advice>
+	<!-- 3进行AOP织入 -->
+	<aop:config proxy-target-class="true">
+		<!-- 声明切面 -->
+		<aop:pointcut
+			expression="execution(* edu.jwj439.sys.service.impl.*.*(..))"
+			id="pc1" />
+		<aop:pointcut
+			expression="execution(* edu.jwj439.bus.service.impl.*.*(..))"
+			id="pc2" />
+		<aop:pointcut
+			expression="execution(* edu.jwj439.stats.service.impl.*.*(..))"
+			id="pc3" />
+		<!-- 织入 -->
+		<aop:advisor advice-ref="advise" pointcut-ref="pc1" />
+		<aop:advisor advice-ref="advise" pointcut-ref="pc2" />
+		<aop:advisor advice-ref="advise" pointcut-ref="pc3" />
+	</aop:config>
+	<!-- 扫描计划任务 -->
+	<context:component-scan
+		base-package="edu.jwj.bus.task"></context:component-scan>
+
+	<!-- 注入ApplicationContextAware接口实现类，spring上下文环境 -->
+	<bean id="applicationContextUtil"
+		class="edu.jwj439.sys.utils.ApplicationContextUtil" />
+</beans>
